@@ -37,11 +37,13 @@ Steps to create a self-signed cerficate authority.  You must configure your syst
 
 1. Create a certificate
 
+        cd ~/myca/private
         openssl genrsa -out api.ocp4.example.com.key 2048
 
 1. Generate a csr
 
-        openssl req -new -key api.ocp4.example.com.key -out api.ocp4.example.com.csr
+        cd ~/myca/certs
+        openssl req -new -key ../private/api.ocp4.example.com.key -out api.ocp4.example.com.csr
 
         You are about to be asked to enter information that will be incorporated
         into your certificate request.
