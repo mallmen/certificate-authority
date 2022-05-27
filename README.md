@@ -7,8 +7,14 @@ Steps to create a self-signed cerficate authority.  You must configure your syst
 
 1. Create the key
 
+    > *You must add a passphrase to the key when generating it.  Do not lose the passphrase.*
+
         cd ~/myca/private
         openssl genrsa -des3 -out myCA.key 2048
+
+1. __*(optional)*__ Remove passphrase from root key
+
+        openssl rsa -in myCA.key -out myCA.key
 
 1. Create the certificate
 
