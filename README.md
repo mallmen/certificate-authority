@@ -52,9 +52,9 @@ Steps to create a self-signed cerficate authority.  You must configure your syst
 
 1. Create a csr
 
-    The *Common Name* can be an FQDN or any other descriptive name for your certificate.  Ensure you use the correct FQDN in the extensions file in the next step.
-
-    > *Do not* use a password when prompted or anything using your SSL certificate will require someone to manually input the passphrase before the certificate can be used.
+    > The *Common Name* can be an FQDN or any other descriptive name for your certificate.  Ensure you use the correct FQDN in the extensions file in the next step.  
+    >
+    >*Do not* use a password when prompted or anything using your SSL certificate will require someone to manually input the passphrase before the certificate can be used.
 
         cd ~/myca/certs
         openssl req -new -key ../private/api.ocp4.example.com.key -out api.ocp4.example.com.csr
