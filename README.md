@@ -41,12 +41,20 @@ Steps to create a self-signed cerficate authority.  You must configure your syst
 
         sudo security add-trusted-cert -d -r trustRoot -k "/Library/Keychains/System.keychain" myCA.pem
 
-1. Create a certificate
+
+
+### Creating a Signed Certificate
+
+1. Create a key
 
         cd ~/myca/private
         openssl genrsa -out api.ocp4.example.com.key 2048
 
-1. Generate a csr
+1. Create a csr
+
+    The *Common Name* can be an FQDN or any other descriptive name for your certificate.  Ensure you use the correct FQDN in the extensions file in the next step.
+
+    > *Do not* use a password when prompted or anything using your SSL certificate will require someone to manually input the passphrase before the certificate can be used.
 
         cd ~/myca/certs
         openssl req -new -key ../private/api.ocp4.example.com.key -out api.ocp4.example.com.csr
@@ -70,7 +78,9 @@ Steps to create a self-signed cerficate authority.  You must configure your syst
         to be sent with your certificate request
         A challenge password []:
 
-1. Create extentions file
+1. Create a SAN extentions file
+
+    > Multiple DNS names can be included here.  Increment the number after _DNS_.  Additionally, you can include IP addresses the certificate will validate by using _IP.#_.
 
         cat <<EOF > api.ocp4.example.com.ext
         authorityKeyIdentifier=keyid,issuer
