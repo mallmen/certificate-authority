@@ -2,7 +2,7 @@
   gather_facts: no
 
   vars:
-    ca_path: /Users/mallmen/myca
+    ca_path: /some/path
     cert_path: "{{ ca_path }}/certs"
     csr_path: "{{ ca_path }}/csrs"
     key_path: "{{ ca_path }}/private"
