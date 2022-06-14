@@ -1,0 +1,59 @@
+- hosts: localhost
+  gather_facts: yes
+
+  vars:
+    ca_path: /some/path
+    filename: rootCA
+    common_name: Root CA
+    #passphrase: <password>
+  
+  tasks:
+    - name: Create CA directory
+      file:
+        path: "{{ ca_path }}"
+        state: directory
+
+    - name: Generate private key
+      community.crypto.openssl_privatekey:
+        path: "{{ ca_path }}/{{ filename }}.key"
+        passphrase: "{{ passphrase | default(omit) }}"
+  
+    - name: Generate csr
+      community.crypto.openssl_csr_pipe:
+        privatekey_path: "{{ ca_path }}/{{ filename }}.key"
+        common_name: "{{ common_name }}"
+        use_common_name_for_san: false
+        extendedKeyUsage:
+          - serverAuth
+        basic_constraints:
+          - 'CA:TRUE'
+        basic_constraints_critical: yes
+        key_usage:
+          - keyCertSign
+        key_usage_critical: true
+      register: ca_csr
+  
+    - name: Generate CA certificate from CSR
+      community.crypto.x509_certificate:
+        path: "{{ ca_path }}/{{ filename }}.pem"
+        csr_content: "{{ ca_csr.csr }}"
+        privatekey_path: "{{ ca_path }}/{{ filename }}.key"
+        privatekey_passphrase: "{{ passphrase | default(omit) }}"
+        provider: selfsigned
+
+    - name: Copy CA to trust store
+      when: ansible_os_family == "RedHat"
+      copy:
+        src: "{{ ca_path }}/{{ filename }}.pem"
+        dest: /etc/pki/ca-trust/source/anchors
+      become: yes
+
+    - name: Add CA to system trust
+      when: ansible_os_family == "Darwin"
+      command: 'security add-trusted-cert -d -r trustRoot -k "/Library/Keychains/System.keychain" {{ ca_path }}/{{ filename }}.pem'
+      become: yes
+
+    - name: Add CA to system trust
+      when: ansible_os_family == "RedHat"
+      command: update-ca-trust
+      become: yes

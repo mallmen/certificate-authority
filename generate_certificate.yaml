@@ -1,0 +1,66 @@
+- hosts: localhost
+  gather_facts: no
+
+  vars:
+    ca_path: /Users/mallmen/myca
+    cert_path: "{{ ca_path }}/certs"
+    csr_path: "{{ ca_path }}/csrs"
+    key_path: "{{ ca_path }}/private"
+    san_list: ""
+    subject: "{{ san_list.split(',')[0] }}"
+    filename: "{{ san_list.split(',')[0] }}"
+    #passphrase: <password>
+  
+  tasks:
+    - name: Validate a san_list has been provided
+      assert:
+        that:
+          - san_list != ''
+        fail_msg: You must define san_list as a comma-separated list of hosts to include in Subject Alternative Name
+
+    - name: Create directories for CA
+      file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - "{{ ca_path }}"
+        - "{{ cert_path }}"
+        - "{{ csr_path }}"
+        - "{{ key_path }}"
+
+    - name: Adjust name of files if wildcard cert, i.e. starts with '*'
+      set_fact:
+        filename: "{{ filename.split('.')[1:] | join('.') }}"
+      when: filename.split('.')[0] == '*'
+
+    - name: Generate private key
+      community.crypto.openssl_privatekey:
+        path: "{{ key_path }}/{{ filename }}.key"
+  
+    - name: Generate csr
+      community.crypto.openssl_csr:
+        path: "{{ csr_path }}/{{ filename }}.csr"
+        privatekey_path: "{{ key_path }}/{{ filename }}.key"
+        subject: "CN={{ subject }}"
+        key_usage:
+          - digitalSignature
+          - nonRepudiation
+          - keyEncipherment
+          - dataEncipherment
+        basic_constraints:
+          - CA:FALSE
+        subject_alt_name: "{{ item.value | map('regex_replace', '^', 'DNS:') | list }}"
+      with_dict:
+        dns_server: "{{ san_list.split(',') }}"
+  
+    - name: Generate certificate
+      community.crypto.x509_certificate:
+        path: "{{ cert_path }}/{{ filename }}.pem"
+        csr_path: "{{ csr_path }}/{{ filename }}.csr"
+        ownca_path: "{{ ca_path }}/rootCA.pem"
+        ownca_privatekey_path: "{{ ca_path }}/rootCA.key"
+        ownca_privatekey_passphrase: "{{ passphrase | default(omit) }}"
+        ownca_create_authority_key_identifier: no
+        ownca_create_subject_key_identifier: never_create
+        ownca_not_after: "+825d"
+        provider: ownca
