@@ -1,97 +1,43 @@
+> This repository has been tested on MacOS Big Sur and Fedora 36.  It has been tested using Ansible 2.9.26 and requires the collection `community.crypto` be installed on your control node.
+
 ### Creating a Certificate Authority
-Steps to create a self-signed cerficate authority.  You must configure your systems to trust the root certificate created by this process.
+Ansible playbook to create a self-signed certificate authority.  This will add the CA to the appropriate trust store for Mac and Fedora/RHEL.  
 
-1. Create a directory to store your certificates
+1. Configure `hosts` to run on the appropriate system in your environment
 
-        mkdir ~/myca/{certs,private}
+        sed -i 's/hosts: .*$/hosts: <your_target_host>/' generate_ca.yaml
 
-1. Create the key
+1. Execute the playbook
 
-    > *You must add a passphrase to the key when generating it.  Do not lose the passphrase.*
+    The following variables should be set in the playbook or passed at execution (requires sudo for adding CA to trust store):
 
-        cd ~/myca/private
-        openssl genrsa -des3 -out myCA.key 2048
+        ca_path: <location for your certificate files> (must be set)
+        filename: rootCA (default), change as desired (basename only)
+        common_name: Root CA (default), set as desired for name of your CA
+        passphrase: <password> (optional, commented out by default)
 
-1. __*(optional)*__ Remove passphrase from root key
-
-        openssl rsa -in myCA.key -out myCA.key
-
-1. Create the certificate
-
-        cd ~/myca/certs
-        openssl req -x509 -new -nodes -key ../private/myCA.key -sha256 -days 1825 -out myCA.pem
-
-        Enter pass phrase for myCA.key:
-        You are about to be asked to enter information that will be incorporated
-        into your certificate request.
-        What you are about to enter is what is called a Distinguished Name or a DN.
-        There are quite a few fields but you can leave some blank
-        For some fields there will be a default value,
-        If you enter '.', the field will be left blank.
-        -----
-        Country Name (2 letter code) [AU]:US
-        State or Province Name (full name) [Some-State]:Arizona
-        Locality Name (eg, city) []:Gilbert
-        Organization Name (eg, company) [Internet Widgits Pty Ltd]:
-        Organizational Unit Name (eg, section) []:
-        Common Name (e.g. server FQDN or YOUR name) []:
-        Email Address []:mallmen@redhat.com
-
-1. Add certificate to Macbook trust store
-
-        sudo security add-trusted-cert -d -r trustRoot -k "/Library/Keychains/System.keychain" myCA.pem
-
-
+        ansible-playbook -i <inventory> generate_ca.yaml --ask-become-pass
+    
 
 ### Creating a Signed Certificate
+Ansible playbook to create a certificate using an existing local CA
 
-1. Create a key
+1. Configure `hosts` to run on the appropriate system in your environment
 
-        cd ~/myca/private
-        openssl genrsa -out api.ocp4.example.com.key 2048
+        sed -i 's/hosts: .*$/hosts: <your_target_host>/' generate_certificate.yaml
 
-1. Create a csr
+1. Execute the playbook
 
-    > The *Common Name* can be an FQDN or any other descriptive name for your certificate.  Ensure you use the correct FQDN in the extensions file in the next step.  
-    >
-    >*Do not* use a password when prompted or anything using your SSL certificate will require someone to manually input the passphrase before the certificate can be used.
+    The following variables should be set in the playbook or passed at execution:
 
-        cd ~/myca/certs
-        openssl req -new -key ../private/api.ocp4.example.com.key -out api.ocp4.example.com.csr
+        ca_path: <location for your certificate files> (must be set)
+        san_list: <comma separated list of hosts for certificate SAN> (must be set)
+        subject: <first host in san_list> (default), customize as desired for certificate subject
+        filename: <first host in san_list> (default), customize as desired (basename only)
+        passphrase: <passphrase for CA key> (optional), commented by default
 
-        You are about to be asked to enter information that will be incorporated
-        into your certificate request.
-        What you are about to enter is what is called a Distinguished Name or a DN.
-        There are quite a few fields but you can leave some blank
-        For some fields there will be a default value,
-        If you enter '.', the field will be left blank.
-        -----
-        Country Name (2 letter code) []:US
-        State or Province Name (full name) []:Arizona
-        Locality Name (eg, city) []:Gilbert
-        Organization Name (eg, company) []:
-        Organizational Unit Name (eg, section) []:
-        Common Name (eg, fully qualified host name) []:API Certificate ocp4.example.com cluster
-        Email Address []:mallmen@redhat.com
+    The playbook will ensure that `san_list` is provided.  If generating a wildcard certificate, the `*` will be removed for the `subject` and `filename` variables if those are not specified specifically.
 
-        Please enter the following 'extra' attributes
-        to be sent with your certificate request
-        A challenge password []:
+        ansible-playbook -i <inventory> generate_certificate.yaml -e san_list=host.example.com -e subject=HostCertificate
 
-1. Create a SAN extentions file
-
-    > Multiple DNS names can be included here.  Increment the number after _DNS_.  Additionally, you can include IP addresses the certificate will validate by using _IP.#_.
-
-        cat <<EOF > api.ocp4.example.com.ext
-        authorityKeyIdentifier=keyid,issuer
-        basicConstraints=CA:FALSE
-        keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
-        subjectAltName = @alt_names
-
-        [alt_names]
-        DNS.1 = api.ocp4.example.com
-        EOF
-
-1. Create the cert
-
-        openssl x509 -req -in api.ocp4.example.com.csr -CA myCA.pem -CAkey ../private/myCA.key -CAcreateserial -out api.ocp4.example.com.crt -days 825 -sha256 -extfile api.ocp4.example.com.ext
+    > Although the `subject` should be able to have spaces, I encountered some issues when using spaces and a single host in the `san_list`.
